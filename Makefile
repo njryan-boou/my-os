@@ -1,17 +1,29 @@
-BUILD_DIR := build
-BOOT_SRC := src/boot/boot.asm
-OS_IMAGE := $(BUILD_DIR)/os.bin
+ASM := nasm
+QEMU := qemu-system-x86_64
 
-.PHONY: all run clean
+SRC := src/boot/boot.asm
+BUILD := build
+BIN := $(BUILD)/boot.bin
 
-all: $(OS_IMAGE)
+.PHONY: all run debug disasm hex clean
 
-$(OS_IMAGE): $(BOOT_SRC)
-	mkdir -p $(BUILD_DIR)
-	nasm -f bin $(BOOT_SRC) -o $(OS_IMAGE)
+all: $(BIN)
 
-run: $(OS_IMAGE)
-	qemu-system-x86_64 -drive format=raw,file=$(OS_IMAGE)
+$(BIN): $(SRC)
+	mkdir -p $(BUILD)
+	$(ASM) -f bin $(SRC) -o $(BIN)
+
+run: $(BIN)
+	$(QEMU) -drive format=raw,file=$(BIN)
+
+debug: $(BIN)
+	$(QEMU) -drive format=raw,file=$(BIN) -s -S
+
+disasm: $(BIN)
+	ndisasm -b 16 -o 0x7c00 $(BIN)
+
+hex: $(BIN)
+	xxd -g 1 $(BIN)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD)

@@ -17,6 +17,9 @@ private:
     static constexpr std::size_t width_ = 80;
     static constexpr std::size_t height_ = 25;
 
+    static constexpr std::uint16_t attribute_ = 0x0F00;
+    static constexpr std::uint16_t blank_ = attribute_ | ' ';
+
     volatile std::uint16_t* buffer_ =
         reinterpret_cast<volatile std::uint16_t*>(0xB8000);
 
@@ -24,6 +27,7 @@ private:
     std::size_t column_ = 0;
 
     void put_char(char character);
+    void scroll();
 };
 
 }

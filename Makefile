@@ -14,6 +14,7 @@ IDT_SRC                := src/kernel/interrupts/IDT.cpp
 INTERRUPTS_SRC         := src/kernel/interrupts/interrupts.asm
 MEMORY_MAP_SRC         := src/kernel/memory/MemoryMap.cpp
 PHYSICAL_ALLOCATOR_SRC := src/kernel/memory/PhysicalAllocator.cpp
+PAGING_SRC             := src/kernel/memory/Paging.cpp
 
 
 # -------------------------
@@ -29,6 +30,7 @@ IDT_OBJ                := $(BUILD_DIR)/IDT.o
 INTERRUPTS_OBJ         := $(BUILD_DIR)/interrupts.o
 MEMORY_MAP_OBJ         := $(BUILD_DIR)/MemoryMap.o
 PHYSICAL_ALLOCATOR_OBJ := $(BUILD_DIR)/PhysicalAllocator.o
+PAGING_OBJ             := $(BUILD_DIR)/Paging.o
 
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 KERNEL_PAD := $(BUILD_DIR)/kernel.pad
@@ -103,6 +105,9 @@ $(MEMORY_MAP_OBJ): $(MEMORY_MAP_SRC) | $(BUILD_DIR)
 $(PHYSICAL_ALLOCATOR_OBJ): $(PHYSICAL_ALLOCATOR_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(PHYSICAL_ALLOCATOR_SRC) -o $(PHYSICAL_ALLOCATOR_OBJ)
 
+$(PAGING_OBJ): $(PAGING_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(PAGING_SRC) -o $(PAGING_OBJ)
+
 
 # -------------------------
 # Interrupt assembly
@@ -123,6 +128,7 @@ $(KERNEL_BIN): \
 	$(INTERRUPTS_OBJ) \
 	$(MEMORY_MAP_OBJ) \
 	$(PHYSICAL_ALLOCATOR_OBJ) \
+	$(PAGING_OBJ) \
 	linker.ld
 	$(LD) -T linker.ld \
 		$(KERNEL_OBJ) \
@@ -131,6 +137,7 @@ $(KERNEL_BIN): \
 		$(INTERRUPTS_OBJ) \
 		$(MEMORY_MAP_OBJ) \
 		$(PHYSICAL_ALLOCATOR_OBJ) \
+		$(PAGING_OBJ) \
 		-o $(KERNEL_BIN)
 
 

@@ -16,7 +16,7 @@ start:
     ; Read stage 2 from disk into memory at 0x1000.
 
     mov ah, 0x02        ; BIOS disk read
-    mov al, 1           ; Read 1 sector
+    mov al, 8           ; Read 8 sector
 
     mov ch, 0           ; Cylinder 0
     mov cl, 2           ; Sector 2

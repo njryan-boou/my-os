@@ -104,4 +104,4 @@ message:
 
 
 ; Fill one complete disk sector
-times 512 - ($ - $$) db 0
+times 4096 - ($ - $$) db 0

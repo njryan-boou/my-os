@@ -1,6 +1,6 @@
-#include "PhysicalAllocator.hpp"
+#include <memory/PhysicalAllocator.hpp>
 
-#include "MemoryMap.hpp"
+#include <memory/MemoryMap.hpp>
 
 namespace kernel::memory {
 

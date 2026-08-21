@@ -11,13 +11,21 @@ STAGE2_SRC := src/boot/stage2.asm
 KERNEL_ENTRY_SRC       := src/kernel/entry.asm
 KERNEL_SRC             := src/kernel/kernel.cpp
 TERMINAL_SRC           := src/kernel/terminal/Terminal.cpp
+
 IDT_SRC                := src/kernel/interrupts/IDT.cpp
+PIC_SRC                := src/kernel/interrupts/PIC.cpp
 INTERRUPTS_SRC         := src/kernel/interrupts/interrupts.asm
+
+KEYBOARD_SRC           := src/kernel/drivers/keyboard/Keyboard.cpp
+INPUT_SRC              := src/kernel/input/Input.cpp
+
 MEMORY_MAP_SRC         := src/kernel/memory/MemoryMap.cpp
 PHYSICAL_ALLOCATOR_SRC := src/kernel/memory/PhysicalAllocator.cpp
 PAGING_SRC             := src/kernel/memory/Paging.cpp
 KERNEL_HEAP_SRC        := src/kernel/memory/KernelHeap.cpp
 NEW_DELETE_SRC         := src/kernel/memory/NewDelete.cpp
+
+PRINT_SRC              := lib/src/io/Print.cpp
 
 
 # -------------------------
@@ -30,13 +38,21 @@ STAGE2_BIN := $(BUILD_DIR)/stage2.bin
 KERNEL_ENTRY_OBJ       := $(BUILD_DIR)/entry.o
 KERNEL_OBJ             := $(BUILD_DIR)/kernel.o
 TERMINAL_OBJ           := $(BUILD_DIR)/Terminal.o
+
 IDT_OBJ                := $(BUILD_DIR)/IDT.o
+PIC_OBJ                := $(BUILD_DIR)/PIC.o
 INTERRUPTS_OBJ         := $(BUILD_DIR)/interrupts.o
+
+KEYBOARD_OBJ           := $(BUILD_DIR)/Keyboard.o
+INPUT_OBJ              := $(BUILD_DIR)/Input.o
+
 MEMORY_MAP_OBJ         := $(BUILD_DIR)/MemoryMap.o
 PHYSICAL_ALLOCATOR_OBJ := $(BUILD_DIR)/PhysicalAllocator.o
 PAGING_OBJ             := $(BUILD_DIR)/Paging.o
 KERNEL_HEAP_OBJ        := $(BUILD_DIR)/KernelHeap.o
 NEW_DELETE_OBJ         := $(BUILD_DIR)/NewDelete.o
+
+PRINT_OBJ              := $(BUILD_DIR)/Print.o
 
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 KERNEL_PAD := $(BUILD_DIR)/kernel.pad
@@ -61,14 +77,16 @@ CXXFLAGS := \
 	-fno-pic \
 	-fno-asynchronous-unwind-tables \
 	-fno-unwind-tables \
-	-mno-red-zone
+	-mno-red-zone \
+	-Ilib/include \
+	-Isrc/kernel
 
 
 # -------------------------
 # Targets
 # -------------------------
 
-.PHONY: all run clean
+.PHONY: all run osrun clean
 
 all: $(OS_IMAGE)
 
@@ -110,8 +128,40 @@ $(KERNEL_OBJ): $(KERNEL_SRC) | $(BUILD_DIR)
 $(TERMINAL_OBJ): $(TERMINAL_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(TERMINAL_SRC) -o $(TERMINAL_OBJ)
 
+
+# -------------------------
+# Interrupts
+# -------------------------
+
 $(IDT_OBJ): $(IDT_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(IDT_SRC) -o $(IDT_OBJ)
+
+$(PIC_OBJ): $(PIC_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(PIC_SRC) -o $(PIC_OBJ)
+
+$(INTERRUPTS_OBJ): $(INTERRUPTS_SRC) | $(BUILD_DIR)
+	nasm -f elf64 $(INTERRUPTS_SRC) -o $(INTERRUPTS_OBJ)
+
+
+# -------------------------
+# Drivers
+# -------------------------
+
+$(KEYBOARD_OBJ): $(KEYBOARD_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(KEYBOARD_SRC) -o $(KEYBOARD_OBJ)
+
+
+# -------------------------
+# Input
+# -------------------------
+
+$(INPUT_OBJ): $(INPUT_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(INPUT_SRC) -o $(INPUT_OBJ)
+
+
+# -------------------------
+# Memory
+# -------------------------
 
 $(MEMORY_MAP_OBJ): $(MEMORY_MAP_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(MEMORY_MAP_SRC) -o $(MEMORY_MAP_OBJ)
@@ -130,11 +180,11 @@ $(NEW_DELETE_OBJ): $(NEW_DELETE_SRC) | $(BUILD_DIR)
 
 
 # -------------------------
-# Interrupt assembly
+# Library
 # -------------------------
 
-$(INTERRUPTS_OBJ): $(INTERRUPTS_SRC) | $(BUILD_DIR)
-	nasm -f elf64 $(INTERRUPTS_SRC) -o $(INTERRUPTS_OBJ)
+$(PRINT_OBJ): $(PRINT_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(PRINT_SRC) -o $(PRINT_OBJ)
 
 
 # -------------------------
@@ -146,24 +196,32 @@ $(KERNEL_BIN): \
 	$(KERNEL_OBJ) \
 	$(TERMINAL_OBJ) \
 	$(IDT_OBJ) \
+	$(PIC_OBJ) \
 	$(INTERRUPTS_OBJ) \
+	$(KEYBOARD_OBJ) \
+	$(INPUT_OBJ) \
 	$(MEMORY_MAP_OBJ) \
 	$(PHYSICAL_ALLOCATOR_OBJ) \
 	$(PAGING_OBJ) \
 	$(KERNEL_HEAP_OBJ) \
 	$(NEW_DELETE_OBJ) \
+	$(PRINT_OBJ) \
 	linker.ld
 	$(LD) -T linker.ld \
 		$(KERNEL_ENTRY_OBJ) \
 		$(KERNEL_OBJ) \
 		$(TERMINAL_OBJ) \
 		$(IDT_OBJ) \
+		$(PIC_OBJ) \
 		$(INTERRUPTS_OBJ) \
+		$(KEYBOARD_OBJ) \
+		$(INPUT_OBJ) \
 		$(MEMORY_MAP_OBJ) \
 		$(PHYSICAL_ALLOCATOR_OBJ) \
 		$(PAGING_OBJ) \
 		$(KERNEL_HEAP_OBJ) \
 		$(NEW_DELETE_OBJ) \
+		$(PRINT_OBJ) \
 		-Map=$(BUILD_DIR)/kernel.map \
 		-o $(KERNEL_BIN)
 
@@ -173,9 +231,9 @@ $(KERNEL_BIN): \
 # -------------------------
 
 $(KERNEL_PAD): $(KERNEL_BIN)
-	test $$(stat -c%s $(KERNEL_BIN)) -le 8192
+	test $$(stat -c%s $(KERNEL_BIN)) -le 12288
 	cp $(KERNEL_BIN) $(KERNEL_PAD)
-	truncate -s 8192 $(KERNEL_PAD)
+	truncate -s 12288 $(KERNEL_PAD)
 
 
 # -------------------------
@@ -199,11 +257,17 @@ run: $(OS_IMAGE)
 
 
 # -------------------------
+# Clean rebuild + run
+# -------------------------
+
+osrun:
+	$(MAKE) clean
+	$(MAKE) run
+
+
+# -------------------------
 # Clean
 # -------------------------
 
 clean:
 	rm -rf $(BUILD_DIR)
-
-osrun:
-	./run.sh

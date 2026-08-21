@@ -1,6 +1,8 @@
-#include "IDT.hpp"
+#include <interrupts/IDT.hpp>
 
-#include "../terminal/Terminal.hpp"
+#include <interrupts/PIC.hpp>
+#include <drivers/keyboard/Keyboard.hpp>
+#include <terminal/Terminal.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -27,12 +29,22 @@ struct [[gnu::packed]] IDTDescriptor
 IDTEntry idt[256]{};
 
 
+// -------------------------
+// Assembly interrupt stubs
+// -------------------------
+
 extern "C" void exception_0();
 extern "C" void exception_6();
 extern "C" void exception_8();
 extern "C" void exception_13();
 extern "C" void exception_14();
 
+extern "C" void keyboard_interrupt();
+
+
+// -------------------------
+// IDT entry setup
+// -------------------------
 
 void set_entry(
     std::size_t vector,
@@ -42,7 +54,8 @@ void set_entry(
         reinterpret_cast<std::uint64_t>(handler);
 
     idt[vector].offset_low =
-        static_cast<std::uint16_t>(address & 0xFFFF);
+        static_cast<std::uint16_t>(
+            address & 0xFFFF);
 
     idt[vector].selector = 0x18;
     idt[vector].ist = 0;
@@ -61,6 +74,10 @@ void set_entry(
     idt[vector].reserved = 0;
 }
 
+
+// -------------------------
+// Exception names
+// -------------------------
 
 const char* exception_name(std::uint64_t vector)
 {
@@ -89,30 +106,45 @@ const char* exception_name(std::uint64_t vector)
 }
 
 
+// -------------------------
+// IDT initialization
+// -------------------------
+
 namespace kernel::interrupts {
 
 void initialize()
 {
+    // CPU exceptions.
     set_entry(0, exception_0);
     set_entry(6, exception_6);
     set_entry(8, exception_8);
     set_entry(13, exception_13);
     set_entry(14, exception_14);
 
+    // IRQ 1 -> vector 0x21 after PIC remapping.
+    set_entry(0x21, keyboard_interrupt);
+
     const IDTDescriptor descriptor{
-        static_cast<std::uint16_t>(sizeof(idt) - 1),
+        static_cast<std::uint16_t>(
+            sizeof(idt) - 1),
+
         reinterpret_cast<std::uint64_t>(idt)
     };
 
     asm volatile(
         "lidt %0"
         :
-        : "m"(descriptor)
-    );
+        : "m"(descriptor));
+
+    initialize_pic();
 }
 
 }
 
+
+// -------------------------
+// CPU exception handler
+// -------------------------
 
 extern "C" [[noreturn]]
 void exception_handler(
@@ -143,8 +175,7 @@ void exception_handler(
 
         asm volatile(
             "mov %%cr2, %0"
-            : "=r"(fault_address)
-        );
+            : "=r"(fault_address));
 
         terminal.write("Address:   ");
         terminal.write_hex(fault_address);
@@ -155,4 +186,15 @@ void exception_handler(
     {
         asm volatile("cli; hlt");
     }
+}
+
+
+// -------------------------
+// Keyboard interrupt bridge
+// -------------------------
+
+extern "C"
+void keyboard_handler()
+{
+    kernel::drivers::keyboard::handle_interrupt();
 }

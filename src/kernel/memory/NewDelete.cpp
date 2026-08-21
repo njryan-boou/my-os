@@ -1,6 +1,6 @@
-#include "NewDelete.hpp"
+#include <memory/NewDelete.hpp>
 
-#include "KernelHeap.hpp"
+#include <memory/KernelHeap.hpp>
 
 #include <cstddef>
 #include <new>

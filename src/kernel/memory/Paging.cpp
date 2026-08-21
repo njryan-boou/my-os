@@ -1,6 +1,6 @@
-#include "Paging.hpp"
+#include <memory/Paging.hpp>
 
-#include "PhysicalAllocator.hpp"
+#include <memory/PhysicalAllocator.hpp>
 
 #include <cstddef>
 #include <cstdint>

@@ -1,7 +1,7 @@
-#include "KernelHeap.hpp"
+#include <memory/KernelHeap.hpp>
 
-#include "Paging.hpp"
-#include "PhysicalAllocator.hpp"
+#include <memory/Paging.hpp>
+#include <memory/PhysicalAllocator.hpp>
 
 #include <cstddef>
 #include <cstdint>

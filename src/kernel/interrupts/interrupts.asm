@@ -3,6 +3,7 @@ bits 64
 section .text
 
 extern exception_handler
+extern keyboard_handler
 
 global exception_0
 global exception_6
@@ -10,29 +11,27 @@ global exception_8
 global exception_13
 global exception_14
 
+global keyboard_interrupt
+
 
 ; --------------------------------
 ; Exceptions WITHOUT CPU error code
 ; --------------------------------
 
 exception_0:
-    push qword 0        ; synthetic error code
-    push qword 0        ; vector
+    push qword 0
+    push qword 0
     jmp exception_common
 
 exception_6:
-    push qword 0        ; synthetic error code
-    push qword 6        ; vector
+    push qword 0
+    push qword 6
     jmp exception_common
 
 
 ; --------------------------------
 ; Exceptions WITH CPU error code
 ; --------------------------------
-;
-; For these, the CPU has already pushed an error code.
-; We only push the vector number.
-;
 
 exception_8:
     push qword 8
@@ -48,22 +47,15 @@ exception_14:
 
 
 ; --------------------------------
-; Common bridge to C++
+; Common exception bridge
 ; --------------------------------
 
 exception_common:
     cli
 
-    ; System V x86-64 calling convention:
-    ;
-    ; RDI = first argument
-    ; RSI = second argument
+    mov rdi, [rsp]
+    mov rsi, [rsp + 8]
 
-    mov rdi, [rsp]        ; vector
-    mov rsi, [rsp + 8]    ; error code
-
-    ; We're never returning, so we can safely realign
-    ; the stack before entering C++.
     and rsp, -16
 
     call exception_handler
@@ -72,3 +64,55 @@ exception_common:
     cli
     hlt
     jmp .halt
+
+
+; --------------------------------
+; Keyboard IRQ 1
+; --------------------------------
+
+keyboard_interrupt:
+    ; Hardware interrupts can happen at any point,
+    ; so preserve the interrupted code's registers.
+
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+    ; Preserve the exact interrupt-stack location
+    ; while satisfying the C++ ABI alignment.
+    mov r12, rsp
+    and rsp, -16
+
+    call keyboard_handler
+
+    mov rsp, r12
+
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax
+
+    iretq

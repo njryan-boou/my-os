@@ -1,6 +1,9 @@
-#include "Terminal.hpp"
+#include <terminal/Terminal.hpp>
 
 namespace kernel {
+
+std::size_t Terminal::row_ = 0;
+std::size_t Terminal::column_ = 0;
 
 void Terminal::clear()
 {
@@ -68,6 +71,47 @@ void Terminal::put_char(char character)
     if (row_ >= height_)
     {
         row_ = 0;
+    }
+}
+
+void Terminal::write(char character)
+{
+    put_char(character);
+}
+
+void Terminal::backspace()
+{
+    if (row_ == 0 && column_ == 0)
+    {
+        return;
+    }
+
+    if (column_ > 0)
+    {
+        --column_;
+    }
+    else
+    {
+        --row_;
+        column_ = width_ - 1;
+    }
+
+    const std::size_t index =
+        row_ * width_ + column_;
+
+    buffer_[index] = blank_;
+}
+
+void Terminal::tab()
+{
+    constexpr std::size_t tab_width = 4;
+
+    const std::size_t spaces =
+        tab_width - (column_ % tab_width);
+
+    for (std::size_t i = 0; i < spaces; ++i)
+    {
+        put_char(' ');
     }
 }
 

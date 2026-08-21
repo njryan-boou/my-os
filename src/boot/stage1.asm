@@ -38,11 +38,11 @@ start:
     ; Load kernel
     ;
     ; LBA 9
-    ; 16 sectors
+    ; 24 sectors
     ; destination 0x2000
     ; -------------------------
 
-    mov word [dap.count], 16
+    mov word [dap.count], 24
     mov word [dap.offset], 0x2000
     mov word [dap.segment], 0x0000
     mov dword [dap.lba_low], 9

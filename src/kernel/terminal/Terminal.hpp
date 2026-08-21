@@ -11,7 +11,10 @@ public:
     void clear();
 
     void write(const char* text);
+    void write(char character);
     void write_hex(std::uint64_t value);
+    void backspace();
+    void tab();
 
 private:
     static constexpr std::size_t width_ = 80;
@@ -23,8 +26,8 @@ private:
     volatile std::uint16_t* buffer_ =
         reinterpret_cast<volatile std::uint16_t*>(0xB8000);
 
-    std::size_t row_ = 0;
-    std::size_t column_ = 0;
+    static std::size_t row_;
+    static std::size_t column_;
 
     void put_char(char character);
 };

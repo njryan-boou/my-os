@@ -204,3 +204,6 @@ run: $(OS_IMAGE)
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+osrun:
+	./run.sh

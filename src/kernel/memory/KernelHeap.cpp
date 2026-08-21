@@ -3,6 +3,9 @@
 #include "Paging.hpp"
 #include "PhysicalAllocator.hpp"
 
+#include <cstddef>
+#include <cstdint>
+
 namespace kernel::memory {
 
 KernelHeap::KernelHeap(PhysicalAllocator& allocator)
@@ -10,21 +13,22 @@ KernelHeap::KernelHeap(PhysicalAllocator& allocator)
 {
 }
 
-std::size_t KernelHeap::align(std::size_t size)
+std::size_t KernelHeap::align_up(
+    std::size_t value,
+    std::size_t alignment)
 {
-    constexpr std::size_t alignment = 8;
-
-    return (size + alignment - 1)
+    return (value + alignment - 1)
         & ~(alignment - 1);
 }
 
 bool KernelHeap::expand(std::size_t required_size)
 {
-    std::size_t total_size =
-        required_size + sizeof(Block);
+    const std::size_t total_size =
+        sizeof(Block) + required_size;
 
-    std::size_t pages =
-        (total_size + page_size - 1) / page_size;
+    const std::size_t pages =
+        (total_size + page_size - 1)
+        / page_size;
 
     const std::uint64_t region_start = mapped_end_;
 
@@ -80,12 +84,21 @@ bool KernelHeap::expand(std::size_t required_size)
 
 void KernelHeap::split(
     Block* block,
-    std::size_t size)
+    std::size_t consumed_size)
 {
-    constexpr std::size_t minimum_remaining = 8;
+    constexpr std::size_t minimum_payload = 8;
 
+    /*
+     * A useful remainder must be large enough for:
+     *
+     * new Block header
+     * +
+     * at least a tiny allocation
+     */
     if (block->size <
-        size + sizeof(Block) + minimum_remaining)
+        consumed_size
+        + sizeof(Block)
+        + minimum_payload)
     {
         return;
     }
@@ -94,26 +107,44 @@ void KernelHeap::split(
         reinterpret_cast<Block*>(
             reinterpret_cast<std::uintptr_t>(block)
             + sizeof(Block)
-            + size);
+            + consumed_size);
 
     new_block->size =
-        block->size - size - sizeof(Block);
+        block->size
+        - consumed_size
+        - sizeof(Block);
 
     new_block->free = true;
     new_block->next = block->next;
 
-    block->size = size;
+    block->size = consumed_size;
     block->next = new_block;
 }
 
 void* KernelHeap::allocate(std::size_t size)
+{
+    return allocate(
+        size,
+        alignof(std::max_align_t));
+}
+
+void* KernelHeap::allocate(
+    std::size_t size,
+    std::size_t alignment)
 {
     if (size == 0)
     {
         return nullptr;
     }
 
-    size = align(size);
+    /*
+     * Alignment must be a nonzero power of two.
+     */
+    if (alignment == 0 ||
+        (alignment & (alignment - 1)) != 0)
+    {
+        return nullptr;
+    }
 
     for (;;)
     {
@@ -121,22 +152,80 @@ void* KernelHeap::allocate(std::size_t size)
 
         while (current != nullptr)
         {
-            if (current->free &&
-                current->size >= size)
+            if (!current->free)
             {
-                split(current, size);
+                current = current->next;
+                continue;
+            }
+
+            const std::uintptr_t block_start =
+                reinterpret_cast<std::uintptr_t>(
+                    current);
+
+            const std::uintptr_t payload_start =
+                block_start + sizeof(Block);
+
+            /*
+             * Reserve one pointer immediately before
+             * the returned address. free() uses this
+             * to recover the owning Block.
+             */
+            const std::uintptr_t raw =
+                payload_start + sizeof(Block*);
+
+            const std::uintptr_t aligned =
+                align_up(raw, alignment);
+
+            /*
+             * Total number of bytes consumed from
+             * the block payload area.
+             */
+            std::size_t consumed =
+                static_cast<std::size_t>(
+                    aligned - payload_start)
+                + size;
+
+            /*
+             * The next Block header itself must also
+             * have suitable alignment.
+             */
+            consumed =
+                align_up(
+                    consumed,
+                    alignof(Block));
+
+            if (current->size >= consumed)
+            {
+                split(current, consumed);
 
                 current->free = false;
 
+                auto** owner_slot =
+                    reinterpret_cast<Block**>(
+                        aligned - sizeof(Block*));
+
+                *owner_slot = current;
+
                 return reinterpret_cast<void*>(
-                    reinterpret_cast<std::uintptr_t>(current)
-                    + sizeof(Block));
+                    aligned);
             }
 
             current = current->next;
         }
 
-        if (!expand(size))
+        /*
+         * Worst-case space required:
+         *
+         * owner pointer
+         * + alignment padding
+         * + requested object
+         */
+        const std::size_t required =
+            sizeof(Block*)
+            + (alignment - 1)
+            + size;
+
+        if (!expand(required))
         {
             return nullptr;
         }
@@ -150,10 +239,16 @@ void KernelHeap::free(void* pointer)
         return;
     }
 
-    auto* block =
-        reinterpret_cast<Block*>(
+    /*
+     * The allocation stored its owning Block*
+     * immediately before the returned pointer.
+     */
+    auto** owner_slot =
+        reinterpret_cast<Block**>(
             reinterpret_cast<std::uintptr_t>(pointer)
-            - sizeof(Block));
+            - sizeof(Block*));
+
+    Block* block = *owner_slot;
 
     block->free = true;
 
@@ -180,7 +275,8 @@ void KernelHeap::merge_free_blocks()
                 reinterpret_cast<std::uintptr_t>(next))
         {
             current->size +=
-                sizeof(Block) + next->size;
+                sizeof(Block)
+                + next->size;
 
             current->next = next->next;
 

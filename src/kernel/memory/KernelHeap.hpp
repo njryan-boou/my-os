@@ -15,6 +15,11 @@ public:
     [[nodiscard]]
     void* allocate(std::size_t size);
 
+    [[nodiscard]]
+    void* allocate(
+        std::size_t size,
+        std::size_t alignment);
+
     void free(void* pointer);
 
 private:
@@ -33,11 +38,15 @@ private:
     Block* head_ = nullptr;
     std::uint64_t mapped_end_ = heap_base;
 
-    static std::size_t align(std::size_t size);
+    static std::size_t align_up(
+        std::size_t value,
+        std::size_t alignment);
 
     bool expand(std::size_t required_size);
 
-    void split(Block* block, std::size_t size);
+    void split(
+        Block* block,
+        std::size_t consumed_size);
 
     void merge_free_blocks();
 };

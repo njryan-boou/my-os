@@ -6,28 +6,6 @@
 
 #include <cstdint>
 
-namespace {
-
-class TestObject
-{
-public:
-    explicit TestObject(std::uint64_t value)
-        : value_(value)
-    {
-    }
-
-    [[nodiscard]]
-    std::uint64_t value() const
-    {
-        return value_;
-    }
-
-private:
-    std::uint64_t value_;
-};
-
-}
-
 extern "C" void kernel_main()
 {
     kernel::Terminal terminal;
@@ -38,28 +16,32 @@ extern "C" void kernel_main()
     kernel::memory::PhysicalAllocator allocator;
     kernel::memory::KernelHeap heap(allocator);
 
-    terminal.write("Heap ready.\n");
-
     kernel::memory::initialize_new_delete(heap);
 
-    terminal.write("new/delete initialized.\n");
+    void* a = heap.allocate(64);
+    void* b = heap.allocate(64);
+    void* c = heap.allocate(64);
 
-    auto* object = new TestObject(42);
-
-    terminal.write("new returned.\n");
-
-    terminal.write("Object address: ");
-    terminal.write_hex(
-        reinterpret_cast<std::uint64_t>(object));
+    terminal.write("A: ");
+    terminal.write_hex(reinterpret_cast<std::uintptr_t>(a));
     terminal.write("\n");
 
-    terminal.write("Object value: ");
-    terminal.write_hex(object->value());
+    terminal.write("B: ");
+    terminal.write_hex(reinterpret_cast<std::uintptr_t>(b));
     terminal.write("\n");
 
-    delete object;
+    terminal.write("C: ");
+    terminal.write_hex(reinterpret_cast<std::uintptr_t>(c));
+    terminal.write("\n");
 
-    terminal.write("delete returned.\n");
+    heap.free(b);
+    heap.free(a);
+
+    void* d = heap.allocate(128);
+
+    terminal.write("D: ");
+    terminal.write_hex(reinterpret_cast<std::uintptr_t>(d));
+    terminal.write("\n");
 
     for (;;)
     {

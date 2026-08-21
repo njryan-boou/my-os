@@ -1,23 +1,19 @@
 bits 16
-org 0x7c00
+org 0x1000
 
-
-; -------------------------
-; 16-bit boot entry
-; -------------------------
-
-start:
+stage2:
     cli
 
-    ; Initialize data segment and stack
+    ; Establish known segment state
     xor ax, ax
     mov ds, ax
+    mov es, ax
     mov ss, ax
-    mov sp, 0x7c00
 
-    sti
+    ; Give stage 2 its own stack
+    mov sp, 0x9000
 
-    ; Load our Global Descriptor Table
+    ; Load our GDT
     lgdt [gdt_descriptor]
 
     ; Enable protected mode
@@ -25,7 +21,7 @@ start:
     or eax, 1
     mov cr0, eax
 
-    ; Far jump loads our code segment and enters 32-bit code
+    ; Enter our 32-bit code segment
     jmp 0x08:protected_mode
 
 
@@ -47,7 +43,6 @@ gdt_data:
 gdt_end:
 
 
-; Structure consumed by LGDT
 gdt_descriptor:
     dw gdt_end - gdt_start - 1
     dd gdt_start
@@ -60,7 +55,7 @@ gdt_descriptor:
 bits 32
 
 protected_mode:
-    ; 0x10 selects our GDT data descriptor
+    ; Load data-segment selector
     mov ax, 0x10
 
     mov ds, ax
@@ -69,10 +64,11 @@ protected_mode:
     mov gs, ax
     mov ss, ax
 
-    ; ESI points to our string
-    mov esi, message
+    ; Establish a 32-bit stack
+    mov esp, 0x9000
 
-    ; VGA text-mode memory
+    ; Print directly through VGA memory
+    mov esi, message
     mov edi, 0xb8000
 
     call print32
@@ -85,47 +81,27 @@ protected_mode:
 
 
 ; -------------------------
-; 32-bit VGA print routine
+; VGA print routine
 ; -------------------------
 
 print32:
-    ; Read next character into AL
     lodsb
-
-    ; Null terminator means end of string
     test al, al
     jz .return
 
-    ; VGA attribute: white text on black background
     mov ah, 0x0f
-
-    ; Write character + attribute to VGA memory
     mov word [edi], ax
 
-    ; Each VGA text cell is 2 bytes
     add edi, 2
-
     jmp print32
-
 
 .return:
     ret
 
 
-; -------------------------
-; Data
-; -------------------------
-
 message:
-    db "Hello World!", 0
+    db "Stage 2: Protected Mode", 0
 
 
-; -------------------------
-; Boot sector
-; -------------------------
-
-; Pad to 510 bytes
-times 510 - ($ - $$) db 0
-
-; BIOS boot signature
-dw 0xaa55
+; Fill one complete disk sector
+times 512 - ($ - $$) db 0

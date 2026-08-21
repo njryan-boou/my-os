@@ -1,29 +1,30 @@
-ASM := nasm
-QEMU := qemu-system-x86_64
+BUILD_DIR := build
 
-SRC := src/boot/boot.asm
-BUILD := build
-BIN := $(BUILD)/boot.bin
+STAGE1_SRC := src/boot/stage1.asm
+STAGE2_SRC := src/boot/stage2.asm
 
-.PHONY: all run debug disasm hex clean
+STAGE1_BIN := $(BUILD_DIR)/stage1.bin
+STAGE2_BIN := $(BUILD_DIR)/stage2.bin
+OS_IMAGE   := $(BUILD_DIR)/os.img
 
-all: $(BIN)
+.PHONY: all run clean
 
-$(BIN): $(SRC)
-	mkdir -p $(BUILD)
-	$(ASM) -f bin $(SRC) -o $(BIN)
+all: $(OS_IMAGE)
 
-run: $(BIN)
-	$(QEMU) -drive format=raw,file=$(BIN)
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-debug: $(BIN)
-	$(QEMU) -drive format=raw,file=$(BIN) -s -S
+$(STAGE1_BIN): $(STAGE1_SRC) | $(BUILD_DIR)
+	nasm -f bin $(STAGE1_SRC) -o $(STAGE1_BIN)
 
-disasm: $(BIN)
-	ndisasm -b 16 -o 0x7c00 $(BIN)
+$(STAGE2_BIN): $(STAGE2_SRC) | $(BUILD_DIR)
+	nasm -f bin $(STAGE2_SRC) -o $(STAGE2_BIN)
 
-hex: $(BIN)
-	xxd -g 1 $(BIN)
+$(OS_IMAGE): $(STAGE1_BIN) $(STAGE2_BIN)
+	cat $(STAGE1_BIN) $(STAGE2_BIN) > $(OS_IMAGE)
+
+run: $(OS_IMAGE)
+	qemu-system-x86_64 -drive format=raw,file=$(OS_IMAGE)
 
 clean:
-	rm -rf $(BUILD)
+	rm -rf $(BUILD_DIR)

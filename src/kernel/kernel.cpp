@@ -1,9 +1,36 @@
 #include "interrupts/IDT.hpp"
 #include "memory/KernelHeap.hpp"
+#include "memory/NewDelete.hpp"
 #include "memory/PhysicalAllocator.hpp"
 #include "terminal/Terminal.hpp"
 
 #include <cstdint>
+
+namespace {
+
+class TestObject
+{
+public:
+    TestObject(
+        std::uint64_t x,
+        std::uint64_t y)
+        : x_(x),
+          y_(y)
+    {
+    }
+
+    [[nodiscard]]
+    std::uint64_t sum() const
+    {
+        return x_ + y_;
+    }
+
+private:
+    std::uint64_t x_;
+    std::uint64_t y_;
+};
+
+}
 
 extern "C" void kernel_main()
 {
@@ -12,46 +39,35 @@ extern "C" void kernel_main()
     terminal.clear();
     kernel::interrupts::initialize();
 
-    kernel::memory::PhysicalAllocator allocator;
-    kernel::memory::KernelHeap heap(allocator);
+    kernel::memory::PhysicalAllocator physical_allocator;
+    kernel::memory::KernelHeap heap(physical_allocator);
 
-    auto* a =
-        static_cast<std::uint64_t*>(
-            heap.allocate(sizeof(std::uint64_t)));
+    kernel::memory::initialize_new_delete(heap);
 
-    auto* b =
-        static_cast<std::uint64_t*>(
-            heap.allocate(sizeof(std::uint64_t)));
+    auto* object =
+        new TestObject(10, 32);
 
-    if (a == nullptr || b == nullptr)
-    {
-        terminal.write("Heap allocation failed.\n");
-
-        for (;;)
-        {
-            asm volatile("hlt");
-        }
-    }
-
-    *a = 0x1111222233334444ULL;
-    *b = 0xAAAABBBBCCCCDDDDULL;
-
-    terminal.write("A address: ");
+    terminal.write("Object address: ");
     terminal.write_hex(
-        reinterpret_cast<std::uint64_t>(a));
+        reinterpret_cast<std::uint64_t>(object));
     terminal.write("\n");
 
-    terminal.write("A value:   ");
-    terminal.write_hex(*a);
+    terminal.write("Object result:  ");
+    terminal.write_hex(object->sum());
     terminal.write("\n");
 
-    terminal.write("B address: ");
+    delete object;
+
+    auto* second =
+        new TestObject(100, 200);
+
+    terminal.write("Second address: ");
     terminal.write_hex(
-        reinterpret_cast<std::uint64_t>(b));
+        reinterpret_cast<std::uint64_t>(second));
     terminal.write("\n");
 
-    terminal.write("B value:   ");
-    terminal.write_hex(*b);
+    terminal.write("Second result:  ");
+    terminal.write_hex(second->sum());
     terminal.write("\n");
 
     for (;;)

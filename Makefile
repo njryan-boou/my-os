@@ -16,6 +16,7 @@ MEMORY_MAP_SRC         := src/kernel/memory/MemoryMap.cpp
 PHYSICAL_ALLOCATOR_SRC := src/kernel/memory/PhysicalAllocator.cpp
 PAGING_SRC             := src/kernel/memory/Paging.cpp
 KERNEL_HEAP_SRC        := src/kernel/memory/KernelHeap.cpp
+NEW_DELETE_SRC         := src/kernel/memory/NewDelete.cpp
 
 
 # -------------------------
@@ -33,6 +34,7 @@ MEMORY_MAP_OBJ         := $(BUILD_DIR)/MemoryMap.o
 PHYSICAL_ALLOCATOR_OBJ := $(BUILD_DIR)/PhysicalAllocator.o
 PAGING_OBJ             := $(BUILD_DIR)/Paging.o
 KERNEL_HEAP_OBJ        := $(BUILD_DIR)/KernelHeap.o
+NEW_DELETE_OBJ         := $(BUILD_DIR)/NewDelete.o
 
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 KERNEL_PAD := $(BUILD_DIR)/kernel.pad
@@ -89,7 +91,7 @@ $(STAGE2_BIN): $(STAGE2_SRC) | $(BUILD_DIR)
 
 
 # -------------------------
-# C++
+# Kernel C++
 # -------------------------
 
 $(KERNEL_OBJ): $(KERNEL_SRC) | $(BUILD_DIR)
@@ -113,6 +115,9 @@ $(PAGING_OBJ): $(PAGING_SRC) | $(BUILD_DIR)
 $(KERNEL_HEAP_OBJ): $(KERNEL_HEAP_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(KERNEL_HEAP_SRC) -o $(KERNEL_HEAP_OBJ)
 
+$(NEW_DELETE_OBJ): $(NEW_DELETE_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(NEW_DELETE_SRC) -o $(NEW_DELETE_OBJ)
+
 
 # -------------------------
 # Interrupt assembly
@@ -135,6 +140,7 @@ $(KERNEL_BIN): \
 	$(PHYSICAL_ALLOCATOR_OBJ) \
 	$(PAGING_OBJ) \
 	$(KERNEL_HEAP_OBJ) \
+	$(NEW_DELETE_OBJ) \
 	linker.ld
 	$(LD) -T linker.ld \
 		$(KERNEL_OBJ) \
@@ -145,6 +151,7 @@ $(KERNEL_BIN): \
 		$(PHYSICAL_ALLOCATOR_OBJ) \
 		$(PAGING_OBJ) \
 		$(KERNEL_HEAP_OBJ) \
+		$(NEW_DELETE_OBJ) \
 		-o $(KERNEL_BIN)
 
 
@@ -153,9 +160,9 @@ $(KERNEL_BIN): \
 # -------------------------
 
 $(KERNEL_PAD): $(KERNEL_BIN)
-	test $$(stat -c%s $(KERNEL_BIN)) -le 4096
+	test $$(stat -c%s $(KERNEL_BIN)) -le 8192
 	cp $(KERNEL_BIN) $(KERNEL_PAD)
-	truncate -s 4096 $(KERNEL_PAD)
+	truncate -s 8192 $(KERNEL_PAD)
 
 
 # -------------------------

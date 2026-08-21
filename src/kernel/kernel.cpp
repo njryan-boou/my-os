@@ -4,5 +4,11 @@ extern "C" void kernel_main()
 {
     kernel::Terminal terminal;
 
-    terminal.write("Hello from C++!");
+    terminal.clear();
+
+    terminal.write("Hello from C++!\n");
+    terminal.write("Kernel running in 64-bit mode.\n");
+
+    terminal.write("Test address: ");
+    terminal.write_hex(0xDEADBEEF);
 }

@@ -12,7 +12,7 @@ std::uint64_t PhysicalAllocator::align_up(std::uint64_t address)
 std::uint64_t PhysicalAllocator::allocate()
 {
     constexpr std::uint64_t minimum_address = 0x100000;
-    constexpr std::uint64_t maximum_address = 0x200000;
+    constexpr std::uint64_t maximum_address = 0x400000;
 
     for (std::size_t i = 0; i < MemoryMap::count(); ++i)
     {

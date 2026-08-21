@@ -188,11 +188,31 @@ protected_mode:
     mov dword [0x11000], 0x12003
     mov dword [0x11004], 0
 
-    ; PD[0] -> identity-map the first 2 MiB.
-    ;
-    ; Present | Writable | Huge Page
-    mov dword [0x12000], 0x00000083
-    mov dword [0x12004], 0
+    ; -------------------------
+    ; Identity-map first 1 GiB
+    ; using 512 × 2 MiB pages
+    ; -------------------------
+
+    mov edi, 0x12000
+    xor ebx, ebx
+    mov ecx, 512
+
+    .map_page:
+        ; Physical base address + flags:
+        ; Present | Writable | Huge Page
+        mov eax, ebx
+        or eax, 0x83
+
+        mov dword [edi], eax
+        mov dword [edi + 4], 0
+
+        ; Next PD entry
+        add edi, 8
+
+        ; Next physical 2 MiB region
+        add ebx, 0x200000
+
+        loop .map_page
 
 
     ; -------------------------

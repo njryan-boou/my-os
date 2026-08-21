@@ -1,3 +1,4 @@
+#include "interrupts/IDT.hpp"
 #include "terminal/Terminal.hpp"
 
 extern "C" void kernel_main()
@@ -5,10 +6,20 @@ extern "C" void kernel_main()
     kernel::Terminal terminal;
 
     terminal.clear();
+    terminal.write("Kernel started.\n");
 
-    terminal.write("Hello from C++!\n");
-    terminal.write("Kernel running in 64-bit mode.\n");
+    kernel::interrupts::initialize();
 
-    terminal.write("Test address: ");
-    terminal.write_hex(0xDEADBEEF);
+    terminal.write("IDT loaded.\n");
+    terminal.write("Triggering invalid opcode...\n");
+
+    asm volatile("ud2");
+
+    // We should never reach this.
+    terminal.write("ERROR: exception returned.\n");
+
+    for (;;)
+    {
+        asm volatile("hlt");
+    }
 }

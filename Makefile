@@ -7,8 +7,10 @@ BUILD_DIR := build
 STAGE1_SRC := src/boot/stage1.asm
 STAGE2_SRC := src/boot/stage2.asm
 
-KERNEL_SRC   := src/kernel/kernel.cpp
+KERNEL_SRC := src/kernel/kernel.cpp
 TERMINAL_SRC := src/kernel/terminal/Terminal.cpp
+IDT_SRC := src/kernel/interrupts/IDT.cpp
+INTERRUPTS_SRC := src/kernel/interrupts/interrupts.asm
 
 
 # -------------------------
@@ -18,8 +20,10 @@ TERMINAL_SRC := src/kernel/terminal/Terminal.cpp
 STAGE1_BIN := $(BUILD_DIR)/stage1.bin
 STAGE2_BIN := $(BUILD_DIR)/stage2.bin
 
-KERNEL_OBJ   := $(BUILD_DIR)/kernel.o
+KERNEL_OBJ := $(BUILD_DIR)/kernel.o
 TERMINAL_OBJ := $(BUILD_DIR)/Terminal.o
+IDT_OBJ := $(BUILD_DIR)/IDT.o
+INTERRUPTS_OBJ := $(BUILD_DIR)/interrupts.o
 
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 KERNEL_PAD := $(BUILD_DIR)/kernel.pad
@@ -32,7 +36,7 @@ OS_IMAGE := $(BUILD_DIR)/os.img
 # -------------------------
 
 CXX := g++
-LD  := ld
+LD := ld
 
 CXXFLAGS := \
 	-m64 \
@@ -56,13 +60,16 @@ CXXFLAGS := \
 all: $(OS_IMAGE)
 
 
-# Create build directory
+# -------------------------
+# Build directory
+# -------------------------
+
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 
 # -------------------------
-# Assembly
+# Bootloader
 # -------------------------
 
 $(STAGE1_BIN): $(STAGE1_SRC) | $(BUILD_DIR)
@@ -73,7 +80,7 @@ $(STAGE2_BIN): $(STAGE2_SRC) | $(BUILD_DIR)
 
 
 # -------------------------
-# C++ kernel
+# C++
 # -------------------------
 
 $(KERNEL_OBJ): $(KERNEL_SRC) | $(BUILD_DIR)
@@ -82,19 +89,40 @@ $(KERNEL_OBJ): $(KERNEL_SRC) | $(BUILD_DIR)
 $(TERMINAL_OBJ): $(TERMINAL_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(TERMINAL_SRC) -o $(TERMINAL_OBJ)
 
+$(IDT_OBJ): $(IDT_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(IDT_SRC) -o $(IDT_OBJ)
+
+
+# -------------------------
+# Interrupt assembly
+# -------------------------
+
+$(INTERRUPTS_OBJ): $(INTERRUPTS_SRC) | $(BUILD_DIR)
+	nasm -f elf64 $(INTERRUPTS_SRC) -o $(INTERRUPTS_OBJ)
+
 
 # -------------------------
 # Link kernel
 # -------------------------
 
-$(KERNEL_BIN): $(KERNEL_OBJ) $(TERMINAL_OBJ) linker.ld
+$(KERNEL_BIN): \
+	$(KERNEL_OBJ) \
+	$(TERMINAL_OBJ) \
+	$(IDT_OBJ) \
+	$(INTERRUPTS_OBJ) \
+	linker.ld
 	$(LD) -T linker.ld \
 		$(KERNEL_OBJ) \
 		$(TERMINAL_OBJ) \
+		$(IDT_OBJ) \
+		$(INTERRUPTS_OBJ) \
 		-o $(KERNEL_BIN)
 
 
-# Pad kernel to 8 sectors / 4096 bytes
+# -------------------------
+# Pad kernel
+# -------------------------
+
 $(KERNEL_PAD): $(KERNEL_BIN)
 	test $$(stat -c%s $(KERNEL_BIN)) -le 4096
 	cp $(KERNEL_BIN) $(KERNEL_PAD)
@@ -102,7 +130,7 @@ $(KERNEL_PAD): $(KERNEL_BIN)
 
 
 # -------------------------
-# Build disk image
+# Build OS image
 # -------------------------
 
 $(OS_IMAGE): $(STAGE1_BIN) $(STAGE2_BIN) $(KERNEL_PAD)

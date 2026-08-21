@@ -11,12 +11,10 @@ extern "C" void kernel_main()
     kernel::interrupts::initialize();
 
     terminal.write("IDT loaded.\n");
-    terminal.write("Triggering invalid opcode...\n");
+    terminal.write("Triggering exception...\n");
 
-    asm volatile("ud2");
 
-    // We should never reach this.
-    terminal.write("ERROR: exception returned.\n");
+    terminal.write("ERROR: returned from exception.\n");
 
     for (;;)
     {

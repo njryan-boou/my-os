@@ -26,7 +26,13 @@ struct [[gnu::packed]] IDTDescriptor
 
 IDTEntry idt[256]{};
 
-extern "C" void invalid_opcode_stub();
+
+extern "C" void exception_0();
+extern "C" void exception_6();
+extern "C" void exception_8();
+extern "C" void exception_13();
+extern "C" void exception_14();
+
 
 void set_entry(
     std::size_t vector,
@@ -41,7 +47,7 @@ void set_entry(
     idt[vector].selector = 0x18;
     idt[vector].ist = 0;
 
-    // Present | Ring 0 | Interrupt Gate
+    // Present | Ring 0 | 64-bit interrupt gate
     idt[vector].attributes = 0x8E;
 
     idt[vector].offset_middle =
@@ -55,13 +61,43 @@ void set_entry(
     idt[vector].reserved = 0;
 }
 
+
+const char* exception_name(std::uint64_t vector)
+{
+    switch (vector)
+    {
+        case 0:
+            return "Divide Error";
+
+        case 6:
+            return "Invalid Opcode";
+
+        case 8:
+            return "Double Fault";
+
+        case 13:
+            return "General Protection Fault";
+
+        case 14:
+            return "Page Fault";
+
+        default:
+            return "Unknown Exception";
+    }
 }
+
+}
+
 
 namespace kernel::interrupts {
 
 void initialize()
 {
-    set_entry(6, invalid_opcode_stub);
+    set_entry(0, exception_0);
+    set_entry(6, exception_6);
+    set_entry(8, exception_8);
+    set_entry(13, exception_13);
+    set_entry(14, exception_14);
 
     const IDTDescriptor descriptor{
         static_cast<std::uint16_t>(sizeof(idt) - 1),
@@ -77,16 +113,43 @@ void initialize()
 
 }
 
+
 extern "C" [[noreturn]]
-void invalid_opcode_handler()
+void exception_handler(
+    std::uint64_t vector,
+    std::uint64_t error_code)
 {
     kernel::Terminal terminal;
 
     terminal.clear();
-    terminal.write("KERNEL PANIC\n");
-    terminal.write("Invalid Opcode (#UD)\n");
-    terminal.write("Vector: 0x");
-    terminal.write_hex(6);
+
+    terminal.write("KERNEL PANIC\n\n");
+
+    terminal.write("Exception: ");
+    terminal.write(exception_name(vector));
+    terminal.write("\n");
+
+    terminal.write("Vector:    ");
+    terminal.write_hex(vector);
+    terminal.write("\n");
+
+    terminal.write("Error:     ");
+    terminal.write_hex(error_code);
+    terminal.write("\n");
+
+    if (vector == 14)
+    {
+        std::uint64_t fault_address;
+
+        asm volatile(
+            "mov %%cr2, %0"
+            : "=r"(fault_address)
+        );
+
+        terminal.write("Address:   ");
+        terminal.write_hex(fault_address);
+        terminal.write("\n");
+    }
 
     for (;;)
     {

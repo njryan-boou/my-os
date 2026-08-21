@@ -1,5 +1,6 @@
 BUILD_DIR := build
 
+
 # -------------------------
 # Sources
 # -------------------------
@@ -7,10 +8,11 @@ BUILD_DIR := build
 STAGE1_SRC := src/boot/stage1.asm
 STAGE2_SRC := src/boot/stage2.asm
 
-KERNEL_SRC := src/kernel/kernel.cpp
-TERMINAL_SRC := src/kernel/terminal/Terminal.cpp
-IDT_SRC := src/kernel/interrupts/IDT.cpp
+KERNEL_SRC     := src/kernel/kernel.cpp
+TERMINAL_SRC   := src/kernel/terminal/Terminal.cpp
+IDT_SRC        := src/kernel/interrupts/IDT.cpp
 INTERRUPTS_SRC := src/kernel/interrupts/interrupts.asm
+MEMORY_MAP_SRC := src/kernel/memory/MemoryMap.cpp
 
 
 # -------------------------
@@ -20,10 +22,11 @@ INTERRUPTS_SRC := src/kernel/interrupts/interrupts.asm
 STAGE1_BIN := $(BUILD_DIR)/stage1.bin
 STAGE2_BIN := $(BUILD_DIR)/stage2.bin
 
-KERNEL_OBJ := $(BUILD_DIR)/kernel.o
-TERMINAL_OBJ := $(BUILD_DIR)/Terminal.o
-IDT_OBJ := $(BUILD_DIR)/IDT.o
+KERNEL_OBJ     := $(BUILD_DIR)/kernel.o
+TERMINAL_OBJ   := $(BUILD_DIR)/Terminal.o
+IDT_OBJ        := $(BUILD_DIR)/IDT.o
 INTERRUPTS_OBJ := $(BUILD_DIR)/interrupts.o
+MEMORY_MAP_OBJ := $(BUILD_DIR)/MemoryMap.o
 
 KERNEL_BIN := $(BUILD_DIR)/kernel.bin
 KERNEL_PAD := $(BUILD_DIR)/kernel.pad
@@ -36,7 +39,7 @@ OS_IMAGE := $(BUILD_DIR)/os.img
 # -------------------------
 
 CXX := g++
-LD := ld
+LD  := ld
 
 CXXFLAGS := \
 	-m64 \
@@ -92,6 +95,9 @@ $(TERMINAL_OBJ): $(TERMINAL_SRC) | $(BUILD_DIR)
 $(IDT_OBJ): $(IDT_SRC) | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $(IDT_SRC) -o $(IDT_OBJ)
 
+$(MEMORY_MAP_OBJ): $(MEMORY_MAP_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(MEMORY_MAP_SRC) -o $(MEMORY_MAP_OBJ)
+
 
 # -------------------------
 # Interrupt assembly
@@ -110,12 +116,14 @@ $(KERNEL_BIN): \
 	$(TERMINAL_OBJ) \
 	$(IDT_OBJ) \
 	$(INTERRUPTS_OBJ) \
+	$(MEMORY_MAP_OBJ) \
 	linker.ld
 	$(LD) -T linker.ld \
 		$(KERNEL_OBJ) \
 		$(TERMINAL_OBJ) \
 		$(IDT_OBJ) \
 		$(INTERRUPTS_OBJ) \
+		$(MEMORY_MAP_OBJ) \
 		-o $(KERNEL_BIN)
 
 

@@ -1,4 +1,5 @@
 #include "interrupts/IDT.hpp"
+#include "memory/MemoryMap.hpp"
 #include "terminal/Terminal.hpp"
 
 extern "C" void kernel_main()
@@ -6,15 +7,16 @@ extern "C" void kernel_main()
     kernel::Terminal terminal;
 
     terminal.clear();
-    terminal.write("Kernel started.\n");
 
     kernel::interrupts::initialize();
 
+    terminal.write("Kernel started.\n");
     terminal.write("IDT loaded.\n");
-    terminal.write("Triggering invalid opcode...\n");
 
-    // We should never reach this.
-    terminal.write("ERROR: exception returned.\n");
+    terminal.write("Memory map entries: ");
+    terminal.write_hex(
+        kernel::memory::MemoryMap::count());
+    terminal.write("\n");
 
     for (;;)
     {

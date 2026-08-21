@@ -1,18 +1,69 @@
 BUILD_DIR := build
 
+# -------------------------
+# Sources
+# -------------------------
+
 STAGE1_SRC := src/boot/stage1.asm
 STAGE2_SRC := src/boot/stage2.asm
 
+KERNEL_SRC   := src/kernel/kernel.cpp
+TERMINAL_SRC := src/kernel/terminal/Terminal.cpp
+
+
+# -------------------------
+# Build outputs
+# -------------------------
+
 STAGE1_BIN := $(BUILD_DIR)/stage1.bin
 STAGE2_BIN := $(BUILD_DIR)/stage2.bin
-OS_IMAGE   := $(BUILD_DIR)/os.img
+
+KERNEL_OBJ   := $(BUILD_DIR)/kernel.o
+TERMINAL_OBJ := $(BUILD_DIR)/Terminal.o
+
+KERNEL_BIN := $(BUILD_DIR)/kernel.bin
+KERNEL_PAD := $(BUILD_DIR)/kernel.pad
+
+OS_IMAGE := $(BUILD_DIR)/os.img
+
+
+# -------------------------
+# Toolchain
+# -------------------------
+
+CXX := g++
+LD  := ld
+
+CXXFLAGS := \
+	-m64 \
+	-ffreestanding \
+	-fno-exceptions \
+	-fno-rtti \
+	-fno-stack-protector \
+	-fno-pie \
+	-fno-pic \
+	-fno-asynchronous-unwind-tables \
+	-fno-unwind-tables \
+	-mno-red-zone
+
+
+# -------------------------
+# Targets
+# -------------------------
 
 .PHONY: all run clean
 
 all: $(OS_IMAGE)
 
+
+# Create build directory
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+
+# -------------------------
+# Assembly
+# -------------------------
 
 $(STAGE1_BIN): $(STAGE1_SRC) | $(BUILD_DIR)
 	nasm -f bin $(STAGE1_SRC) -o $(STAGE1_BIN)
@@ -20,11 +71,59 @@ $(STAGE1_BIN): $(STAGE1_SRC) | $(BUILD_DIR)
 $(STAGE2_BIN): $(STAGE2_SRC) | $(BUILD_DIR)
 	nasm -f bin $(STAGE2_SRC) -o $(STAGE2_BIN)
 
-$(OS_IMAGE): $(STAGE1_BIN) $(STAGE2_BIN)
-	cat $(STAGE1_BIN) $(STAGE2_BIN) > $(OS_IMAGE)
+
+# -------------------------
+# C++ kernel
+# -------------------------
+
+$(KERNEL_OBJ): $(KERNEL_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(KERNEL_SRC) -o $(KERNEL_OBJ)
+
+$(TERMINAL_OBJ): $(TERMINAL_SRC) | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $(TERMINAL_SRC) -o $(TERMINAL_OBJ)
+
+
+# -------------------------
+# Link kernel
+# -------------------------
+
+$(KERNEL_BIN): $(KERNEL_OBJ) $(TERMINAL_OBJ) linker.ld
+	$(LD) -T linker.ld \
+		$(KERNEL_OBJ) \
+		$(TERMINAL_OBJ) \
+		-o $(KERNEL_BIN)
+
+
+# Pad kernel to 8 sectors / 4096 bytes
+$(KERNEL_PAD): $(KERNEL_BIN)
+	test $$(stat -c%s $(KERNEL_BIN)) -le 4096
+	cp $(KERNEL_BIN) $(KERNEL_PAD)
+	truncate -s 4096 $(KERNEL_PAD)
+
+
+# -------------------------
+# Build disk image
+# -------------------------
+
+$(OS_IMAGE): $(STAGE1_BIN) $(STAGE2_BIN) $(KERNEL_PAD)
+	cat \
+		$(STAGE1_BIN) \
+		$(STAGE2_BIN) \
+		$(KERNEL_PAD) \
+		> $(OS_IMAGE)
+
+
+# -------------------------
+# Run
+# -------------------------
 
 run: $(OS_IMAGE)
 	qemu-system-x86_64 -drive format=raw,file=$(OS_IMAGE)
+
+
+# -------------------------
+# Clean
+# -------------------------
 
 clean:
 	rm -rf $(BUILD_DIR)

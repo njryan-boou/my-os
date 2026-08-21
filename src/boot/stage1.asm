@@ -23,7 +23,7 @@ start:
     ; Stage 2 occupies sectors 2-9.
 
     mov ah, 0x02        ; BIOS disk read function
-    mov al, 8           ; Read 8 sectors
+    mov al, 16           ; Read 16 sectors
 
     mov ch, 0           ; Cylinder 0
     mov cl, 2           ; Start at sector 2

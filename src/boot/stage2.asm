@@ -158,23 +158,16 @@ protected_mode:
 bits 64
 
 long_mode:
-    ; Load our data selector
     mov ax, 0x10
 
     mov ds, ax
     mov es, ax
     mov ss, ax
 
-    ; Establish 64-bit stack
     mov rsp, 0x9000
 
-    ; VGA text buffer
-    mov rdi, 0xb8000
-
-    ; Write "64" directly to VGA memory
-    mov word [rdi],     0x0f36
-    mov word [rdi + 2], 0x0f34
-
+    ; Enter the C++ kernel
+    call 0x2000
 
 .halt:
     cli

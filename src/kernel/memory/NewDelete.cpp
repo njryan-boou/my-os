@@ -53,9 +53,6 @@ void operator delete(void* pointer) noexcept
     }
 }
 
-/*
- * Modern compilers may emit sized delete calls.
- */
 void operator delete(
     void* pointer,
     std::size_t) noexcept

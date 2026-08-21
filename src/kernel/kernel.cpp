@@ -11,23 +11,19 @@ namespace {
 class TestObject
 {
 public:
-    TestObject(
-        std::uint64_t x,
-        std::uint64_t y)
-        : x_(x),
-          y_(y)
+    explicit TestObject(std::uint64_t value)
+        : value_(value)
     {
     }
 
     [[nodiscard]]
-    std::uint64_t sum() const
+    std::uint64_t value() const
     {
-        return x_ + y_;
+        return value_;
     }
 
 private:
-    std::uint64_t x_;
-    std::uint64_t y_;
+    std::uint64_t value_;
 };
 
 }
@@ -39,36 +35,31 @@ extern "C" void kernel_main()
     terminal.clear();
     kernel::interrupts::initialize();
 
-    kernel::memory::PhysicalAllocator physical_allocator;
-    kernel::memory::KernelHeap heap(physical_allocator);
+    kernel::memory::PhysicalAllocator allocator;
+    kernel::memory::KernelHeap heap(allocator);
+
+    terminal.write("Heap ready.\n");
 
     kernel::memory::initialize_new_delete(heap);
 
-    auto* object =
-        new TestObject(10, 32);
+    terminal.write("new/delete initialized.\n");
+
+    auto* object = new TestObject(42);
+
+    terminal.write("new returned.\n");
 
     terminal.write("Object address: ");
     terminal.write_hex(
         reinterpret_cast<std::uint64_t>(object));
     terminal.write("\n");
 
-    terminal.write("Object result:  ");
-    terminal.write_hex(object->sum());
+    terminal.write("Object value: ");
+    terminal.write_hex(object->value());
     terminal.write("\n");
 
     delete object;
 
-    auto* second =
-        new TestObject(100, 200);
-
-    terminal.write("Second address: ");
-    terminal.write_hex(
-        reinterpret_cast<std::uint64_t>(second));
-    terminal.write("\n");
-
-    terminal.write("Second result:  ");
-    terminal.write_hex(second->sum());
-    terminal.write("\n");
+    terminal.write("delete returned.\n");
 
     for (;;)
     {

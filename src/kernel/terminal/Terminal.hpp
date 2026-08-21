@@ -27,7 +27,6 @@ private:
     std::size_t column_ = 0;
 
     void put_char(char character);
-    void scroll();
 };
 
 }

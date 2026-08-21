@@ -20,17 +20,22 @@ E820_MAX_ENTRIES equ 64
 stage2:
     cli
 
-    ; Establish known segment state
+    ; Establish known segment state.
     xor ax, ax
     mov ds, ax
     mov es, ax
     mov ss, ax
 
-    ; Temporary 16-bit stack
+    ; Temporary real-mode stack.
     mov sp, 0x9000
 
-    ; Ask BIOS for the complete physical memory map.
+    sti
+
+    ; Ask BIOS for the physical memory map.
     call detect_memory
+
+    ; Disable interrupts before changing CPU modes.
+    cli
 
     ; Load Global Descriptor Table.
     lgdt [gdt_descriptor]
@@ -49,22 +54,22 @@ stage2:
 ; -------------------------
 
 detect_memory:
-    ; EBX = 0 means this is the first E820 request.
+    ; EBX = 0 means this is the first request.
     xor ebx, ebx
 
     ; BP counts the entries we keep.
     xor bp, bp
 
-    ; BIOS writes the first entry to ES:DI.
+    ; BIOS writes entries to ES:DI.
     mov di, MEMORY_MAP
 
 
 .next_entry:
-    ; Prevent the BIOS from overflowing our buffer.
+    ; Prevent buffer overflow.
     cmp bp, E820_MAX_ENTRIES
     jae .done
 
-    ; Select BIOS E820.
+    ; BIOS E820 function.
     mov eax, 0xe820
 
     ; Required "SMAP" signature.
@@ -76,21 +81,20 @@ detect_memory:
     ; Initialize ACPI extended attributes.
     mov dword [es:di + 20], 1
 
-    ; Request the next memory-map entry.
     int 0x15
 
     ; Carry indicates failure/end.
     jc .done
 
-    ; BIOS must return the SMAP signature.
+    ; Verify returned "SMAP" signature.
     cmp eax, 0x534d4150
     jne .done
+
 
     ; -------------------------
     ; Ignore zero-length regions
     ; -------------------------
 
-    ; Length is the 64-bit value at offsets 8-15.
     mov eax, [es:di + 8]
     or eax, [es:di + 12]
 
@@ -102,21 +106,17 @@ detect_memory:
     ; -------------------------
 
     inc bp
-
-    ; Move ES:DI to the next 24-byte slot.
     add di, E820_ENTRY_SIZE
 
 
 .skip_entry:
-    ; BIOS returns a continuation value in EBX.
-    ;
     ; EBX = 0 means there are no more entries.
     test ebx, ebx
     jnz .next_entry
 
 
 .done:
-    ; Make the final count available to the kernel.
+    ; Expose count to the kernel.
     mov [MEMORY_MAP_COUNT], bp
 
     ret
@@ -128,21 +128,50 @@ detect_memory:
 
 gdt_start:
 
+
 ; 0x00 - null descriptor
 gdt_null:
     dq 0x0000000000000000
 
-; 0x08 - 32-bit code segment
+
+; -------------------------
+; 0x08 - 32-bit code
+; -------------------------
+
 gdt_code32:
-    dq 0x00cf9a000000ffff
+    dw 0xffff
+    dw 0x0000
+    db 0x00
+    db 10011010b
+    db 11001111b
+    db 0x00
 
-; 0x10 - data segment
+
+; -------------------------
+; 0x10 - data
+; -------------------------
+
 gdt_data:
-    dq 0x00cf92000000ffff
+    dw 0xffff
+    dw 0x0000
+    db 0x00
+    db 10010010b
+    db 11001111b
+    db 0x00
 
-; 0x18 - 64-bit code segment
+
+; -------------------------
+; 0x18 - 64-bit code
+; -------------------------
+
 gdt_code64:
-    dq 0x00af9a000000ffff
+    dw 0xffff
+    dw 0x0000
+    db 0x00
+    db 10011010b
+    db 10101111b
+    db 0x00
+
 
 gdt_end:
 
@@ -182,50 +211,61 @@ protected_mode:
     mov dword [0x10000], 0x11003
     mov dword [0x10004], 0
 
+
     ; PDPT[0] -> Page Directory at 0x12000
     ;
     ; Present | Writable
     mov dword [0x11000], 0x12003
     mov dword [0x11004], 0
 
+
     ; -------------------------
     ; Identity-map first 1 GiB
-    ; using 512 × 2 MiB pages
+    ;
+    ; 512 x 2 MiB huge pages
     ; -------------------------
 
     mov edi, 0x12000
     xor ebx, ebx
     mov ecx, 512
 
-    .map_page:
-        ; Physical base address + flags:
-        ; Present | Writable | Huge Page
-        mov eax, ebx
-        or eax, 0x83
 
-        mov dword [edi], eax
-        mov dword [edi + 4], 0
+.map_page:
+    ; Physical base address.
+    mov eax, ebx
 
-        ; Next PD entry
-        add edi, 8
+    ; Present | Writable | Huge Page
+    or eax, 0x83
 
-        ; Next physical 2 MiB region
-        add ebx, 0x200000
+    mov dword [edi], eax
+    mov dword [edi + 4], 0
 
-        loop .map_page
+    ; Next page-directory entry.
+    add edi, 8
+
+    ; Next 2 MiB physical region.
+    add ebx, 0x200000
+
+    loop .map_page
 
 
     ; -------------------------
-    ; Configure paging
+    ; Load page-table root
     ; -------------------------
 
-    ; CR3 points to our PML4.
     mov eax, 0x10000
     mov cr3, eax
 
-    ; Enable PAE: CR4.PAE = 1.
+
+    ; -------------------------
+    ; Enable PAE
+    ; -------------------------
+
     mov eax, cr4
+
+    ; CR4.PAE = 1
     or eax, 1 << 5
+
     mov cr4, eax
 
 
@@ -236,13 +276,11 @@ protected_mode:
     ; Select IA32_EFER.
     mov ecx, 0xc0000080
 
-    ; Read EFER into EDX:EAX.
     rdmsr
 
-    ; Set EFER.LME.
+    ; EFER.LME = 1
     or eax, 1 << 8
 
-    ; Write EFER back.
     wrmsr
 
 
@@ -252,7 +290,7 @@ protected_mode:
 
     mov eax, cr0
 
-    ; Set CR0.PG.
+    ; CR0.PG = 1
     or eax, 1 << 31
 
     mov cr0, eax
@@ -262,7 +300,8 @@ protected_mode:
     ; Enter 64-bit mode
     ; -------------------------
 
-    ; 0x18 selects our 64-bit code descriptor.
+    ; Selector 0x18 is our
+    ; 64-bit code descriptor.
     jmp 0x18:long_mode
 
 
@@ -273,23 +312,15 @@ protected_mode:
 bits 64
 
 long_mode:
-    ; Load data segment.
     mov ax, 0x10
 
     mov ds, ax
     mov es, ax
     mov ss, ax
 
-    ; Establish 64-bit stack.
     mov rsp, 0x9000
 
-    ; C++ kernel is loaded at physical address 0x2000.
-    call 0x2000
-
-
-; -------------------------
-; Halt
-; -------------------------
+    jmp 0x2000
 
 .halt:
     cli
@@ -301,5 +332,6 @@ long_mode:
 ; Stage 2 padding
 ; -------------------------
 
-; Stage 2 occupies exactly 8 sectors = 4096 bytes.
+; Stage 2 occupies exactly
+; 8 sectors = 4096 bytes.
 times 4096 - ($ - $$) db 0

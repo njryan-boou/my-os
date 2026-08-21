@@ -8,6 +8,7 @@ BUILD_DIR := build
 STAGE1_SRC := src/boot/stage1.asm
 STAGE2_SRC := src/boot/stage2.asm
 
+KERNEL_ENTRY_SRC       := src/kernel/entry.asm
 KERNEL_SRC             := src/kernel/kernel.cpp
 TERMINAL_SRC           := src/kernel/terminal/Terminal.cpp
 IDT_SRC                := src/kernel/interrupts/IDT.cpp
@@ -26,6 +27,7 @@ NEW_DELETE_SRC         := src/kernel/memory/NewDelete.cpp
 STAGE1_BIN := $(BUILD_DIR)/stage1.bin
 STAGE2_BIN := $(BUILD_DIR)/stage2.bin
 
+KERNEL_ENTRY_OBJ       := $(BUILD_DIR)/entry.o
 KERNEL_OBJ             := $(BUILD_DIR)/kernel.o
 TERMINAL_OBJ           := $(BUILD_DIR)/Terminal.o
 IDT_OBJ                := $(BUILD_DIR)/IDT.o
@@ -91,6 +93,14 @@ $(STAGE2_BIN): $(STAGE2_SRC) | $(BUILD_DIR)
 
 
 # -------------------------
+# Kernel entry
+# -------------------------
+
+$(KERNEL_ENTRY_OBJ): $(KERNEL_ENTRY_SRC) | $(BUILD_DIR)
+	nasm -f elf64 $(KERNEL_ENTRY_SRC) -o $(KERNEL_ENTRY_OBJ)
+
+
+# -------------------------
 # Kernel C++
 # -------------------------
 
@@ -132,6 +142,7 @@ $(INTERRUPTS_OBJ): $(INTERRUPTS_SRC) | $(BUILD_DIR)
 # -------------------------
 
 $(KERNEL_BIN): \
+	$(KERNEL_ENTRY_OBJ) \
 	$(KERNEL_OBJ) \
 	$(TERMINAL_OBJ) \
 	$(IDT_OBJ) \
@@ -143,6 +154,7 @@ $(KERNEL_BIN): \
 	$(NEW_DELETE_OBJ) \
 	linker.ld
 	$(LD) -T linker.ld \
+		$(KERNEL_ENTRY_OBJ) \
 		$(KERNEL_OBJ) \
 		$(TERMINAL_OBJ) \
 		$(IDT_OBJ) \
@@ -152,6 +164,7 @@ $(KERNEL_BIN): \
 		$(PAGING_OBJ) \
 		$(KERNEL_HEAP_OBJ) \
 		$(NEW_DELETE_OBJ) \
+		-Map=$(BUILD_DIR)/kernel.map \
 		-o $(KERNEL_BIN)
 
 

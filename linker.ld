@@ -1,4 +1,4 @@
-ENTRY(kernel_main)
+ENTRY(kernel_entry)
 
 OUTPUT_FORMAT(binary)
 
@@ -8,6 +8,7 @@ SECTIONS
 
     .text :
     {
+        KEEP(*(.text.entry))
         *(.text*)
     }
 
@@ -23,8 +24,12 @@ SECTIONS
 
     .bss :
     {
+        __bss_start = .;
+
         *(.bss*)
         *(COMMON)
+
+        __bss_end = .;
     }
 
     /DISCARD/ :

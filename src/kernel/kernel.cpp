@@ -11,10 +11,10 @@ extern "C" void kernel_main()
     kernel::interrupts::initialize();
 
     terminal.write("IDT loaded.\n");
-    terminal.write("Triggering exception...\n");
+    terminal.write("Triggering invalid opcode...\n");
 
-
-    terminal.write("ERROR: returned from exception.\n");
+    // We should never reach this.
+    terminal.write("ERROR: exception returned.\n");
 
     for (;;)
     {

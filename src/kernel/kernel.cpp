@@ -1,5 +1,5 @@
 #include "interrupts/IDT.hpp"
-#include "memory/Paging.hpp"
+#include "memory/KernelHeap.hpp"
 #include "memory/PhysicalAllocator.hpp"
 #include "terminal/Terminal.hpp"
 
@@ -13,45 +13,45 @@ extern "C" void kernel_main()
     kernel::interrupts::initialize();
 
     kernel::memory::PhysicalAllocator allocator;
+    kernel::memory::KernelHeap heap(allocator);
 
-    const std::uint64_t physical =
-        allocator.allocate();
+    auto* a =
+        static_cast<std::uint64_t*>(
+            heap.allocate(sizeof(std::uint64_t)));
 
-    constexpr std::uint64_t virtual_address =
-        0x40000000;
+    auto* b =
+        static_cast<std::uint64_t*>(
+            heap.allocate(sizeof(std::uint64_t)));
 
-    kernel::memory::Paging::map(
-        virtual_address,
-        physical);
+    if (a == nullptr || b == nullptr)
+    {
+        terminal.write("Heap allocation failed.\n");
 
-    terminal.write("Physical: ");
-    terminal.write_hex(physical);
+        for (;;)
+        {
+            asm volatile("hlt");
+        }
+    }
+
+    *a = 0x1111222233334444ULL;
+    *b = 0xAAAABBBBCCCCDDDDULL;
+
+    terminal.write("A address: ");
+    terminal.write_hex(
+        reinterpret_cast<std::uint64_t>(a));
     terminal.write("\n");
 
-    terminal.write("Virtual:  ");
-    terminal.write_hex(virtual_address);
+    terminal.write("A value:   ");
+    terminal.write_hex(*a);
     terminal.write("\n");
 
-    /*
-     * Write through the NEW virtual address.
-     */
-    volatile auto* value =
-        reinterpret_cast<volatile std::uint64_t*>(
-            virtual_address);
+    terminal.write("B address: ");
+    terminal.write_hex(
+        reinterpret_cast<std::uint64_t>(b));
+    terminal.write("\n");
 
-    *value = 0x123456789ABCDEF0ULL;
-
-    /*
-     * Since the physical page is also inside our identity-mapped
-     * first GiB, we can read the same RAM through its physical
-     * address too.
-     */
-    volatile auto* physical_view =
-        reinterpret_cast<volatile std::uint64_t*>(
-            physical);
-
-    terminal.write("Value:    ");
-    terminal.write_hex(*physical_view);
+    terminal.write("B value:   ");
+    terminal.write_hex(*b);
     terminal.write("\n");
 
     for (;;)
